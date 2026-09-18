@@ -35,6 +35,14 @@ plugins:
       priority: 10
 ```
 
+CPA 7.2.x 的「配额管理 / 认证文件」写死了几家 OAuth。在已经打过 OpenCode Go 补丁的 `management.html` 上再跑：
+
+```bash
+python3 scripts/patch-cpa-quota-page.py /opt/cliproxy-api/static/management.html
+```
+
+并保持 `remote-management.disable-auto-update-panel: true`。硬刷新管理中心后，Command Code 会出现在这两页；接入 Key 后可查模型列表和额度。
+
 ## License
 
 MIT

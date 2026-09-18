@@ -51,6 +51,14 @@ plugins:
 
 Restart CLIProxyAPI. One-click connect writes the provider for you.
 
+CPA 7.2.x hardcodes 配额管理 / 认证文件 to a few OAuth providers. After OpenCode Go's panel patch is in place:
+
+```bash
+python3 scripts/patch-cpa-quota-page.py /opt/cliproxy-api/static/management.html
+```
+
+Keep `remote-management.disable-auto-update-panel: true` so CPA does not overwrite the file on boot. Hard-refresh the management center. Command Code then shows on both pages; models and quota load from the plugin after you connect a key.
+
 ## Plugin config
 
 | Key | Default | Meaning |
