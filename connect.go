@@ -30,7 +30,7 @@ func upsertOpenCodeProviderOpts(configPath, providerName, baseURL, apiKey string
 	if doc == nil {
 		return fmt.Errorf("config.yaml root is not a mapping")
 	}
-	if err := upsertCompatProvider(doc, providerName, baseURL, apiKey, models, proxyURL, zdr); err != nil {
+	if err := upsertCompatProvider(doc, providerName, baseURL, apiKey, models, proxyURL, zdr, "commandcode"); err != nil {
 		return err
 	}
 	if includeClaude {
@@ -124,7 +124,7 @@ func intNode(v int) *yaml.Node {
 	return n
 }
 
-func upsertCompatProvider(doc *yaml.Node, providerName, baseURL, apiKey string, models []string, proxyURL string, zdr bool) error {
+func upsertCompatProvider(doc *yaml.Node, providerName, baseURL, apiKey string, models []string, proxyURL string, zdr bool, aliasPrefix string) error {
 	seq := mappingGet(doc, "openai-compatibility")
 	if seq == nil || seq.Kind != yaml.SequenceNode {
 		seq = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
@@ -149,7 +149,7 @@ func upsertCompatProvider(doc *yaml.Node, providerName, baseURL, apiKey string, 
 	applyZDRHeader(target, zdr)
 	upsertAPIKeyEntry(target, apiKey, proxyURL)
 	if len(models) > 0 {
-		mappingSet(target, "models", modelsSeq(models))
+		mappingSet(target, "models", modelsSeq(models, aliasPrefix))
 	}
 	return nil
 }
@@ -193,11 +193,88 @@ func upsertAPIKeyEntry(provider *yaml.Node, apiKey, proxyURL string) {
 }
 
 func applyProxyURL(entry *yaml.Node, proxyURL string) {
+	applyProxyURLClear(entry, proxyURL, false)
+}
+
+func applyProxyURLClear(entry *yaml.Node, proxyURL string, clearEmpty bool) {
 	proxyURL = strings.TrimSpace(proxyURL)
 	if proxyURL == "" {
+		if clearEmpty {
+			mappingDelete(entry, "proxy-url")
+		}
 		return
 	}
 	mappingSet(entry, "proxy-url", scalarNode(proxyURL))
+}
+
+func persistPluginProxy(configPath, pluginID, proxyURL string) error {
+	if strings.TrimSpace(configPath) == "" {
+		configPath = "config.yaml"
+	}
+	raw, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	var root yaml.Node
+	if err := yaml.Unmarshal(raw, &root); err != nil {
+		return err
+	}
+	doc := mappingNode(&root)
+	if doc == nil {
+		return fmt.Errorf("config.yaml root is not a mapping")
+	}
+	plugins := mappingGet(doc, "plugins")
+	if plugins == nil || plugins.Kind != yaml.MappingNode {
+		plugins = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		mappingSet(doc, "plugins", plugins)
+	}
+	configs := mappingGet(plugins, "configs")
+	if configs == nil || configs.Kind != yaml.MappingNode {
+		configs = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		mappingSet(plugins, "configs", configs)
+	}
+	item := mappingGet(configs, pluginID)
+	if item == nil || item.Kind != yaml.MappingNode {
+		item = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		mappingSet(configs, pluginID, item)
+	}
+	mappingSet(item, "enabled", boolNode(true))
+	mappingSet(item, "proxy_url", scalarNode(strings.TrimSpace(proxyURL)))
+	return persistYAML(configPath, raw, &root)
+}
+
+func applyProxyToProvider(configPath, providerName, proxyURL string) error {
+	if strings.TrimSpace(configPath) == "" {
+		configPath = "config.yaml"
+	}
+	raw, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	var root yaml.Node
+	if err := yaml.Unmarshal(raw, &root); err != nil {
+		return err
+	}
+	doc := mappingNode(&root)
+	if doc == nil {
+		return fmt.Errorf("config.yaml root is not a mapping")
+	}
+	seq := mappingGet(doc, "openai-compatibility")
+	if seq == nil || seq.Kind != yaml.SequenceNode {
+		return nil
+	}
+	for _, item := range seq.Content {
+		if mappingGetString(item, "name") != providerName {
+			continue
+		}
+		keys := mappingGet(item, "api-key-entries")
+		if keys != nil && keys.Kind == yaml.SequenceNode {
+			for _, entry := range keys.Content {
+				applyProxyURLClear(entry, proxyURL, true)
+			}
+		}
+	}
+	return persistYAML(configPath, raw, &root)
 }
 
 func upsertClaudeKey(doc *yaml.Node, apiKey, proxyURL string, zdr bool) error {
@@ -223,12 +300,17 @@ func upsertClaudeKey(doc *yaml.Node, apiKey, proxyURL string, zdr bool) error {
 	return nil
 }
 
-func modelsSeq(models []string) *yaml.Node {
+func modelsSeq(models []string, aliasPrefix string) *yaml.Node {
 	seq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	prefix := strings.Trim(strings.TrimSpace(aliasPrefix), "/")
 	for _, name := range models {
 		item := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		mappingSet(item, "name", scalarNode(name))
-		mappingSet(item, "alias", scalarNode(""))
+		alias := strings.TrimSpace(name)
+		if prefix != "" && alias != "" && !strings.HasPrefix(alias, prefix+"/") {
+			alias = prefix + "/" + alias
+		}
+		mappingSet(item, "alias", scalarNode(alias))
 		seq.Content = append(seq.Content, item)
 	}
 	return seq

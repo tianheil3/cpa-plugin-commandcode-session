@@ -4,7 +4,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
 )
 
-var pluginVersion = "0.1.0"
+var pluginVersion = "0.1.1"
 
 func buildPlugin(configYAML []byte, _ string) (pluginapi.Plugin, error) {
 	cfg, err := parseConfig(configYAML)
@@ -30,6 +30,7 @@ func buildPlugin(configYAML []byte, _ string) (pluginapi.Plugin, error) {
 				{Name: "include_claude", Type: pluginapi.ConfigFieldTypeBoolean, Description: "Also write the same key as a Claude-compatible Command Code channel."},
 				{Name: "zdr", Type: pluginapi.ConfigFieldTypeBoolean, Description: "Send x-cmd-zdr: 1 for zero data retention. Optional; models without a ZDR upstream fail with 422."},
 				{Name: "proxy_url", Type: pluginapi.ConfigFieldTypeString, Description: "Per-key proxy-url written on connect. Empty inherits CPA proxy-url. Use direct to bypass."},
+				{Name: "alias_prefix", Type: pluginapi.ConfigFieldTypeString, Description: "Client-facing model alias prefix. Default commandcode."},
 				{Name: "alpha_base_url", Type: pluginapi.ConfigFieldTypeString, Description: "Command Code alpha API root for quota. Default https://api.commandcode.ai."},
 				{Name: "match_models", Type: pluginapi.ConfigFieldTypeArray, Description: "If set, only rewrite bodies for these exact model names."},
 				{Name: "match_prefixes", Type: pluginapi.ConfigFieldTypeArray, Description: "If set, only rewrite bodies for models with these prefixes."},

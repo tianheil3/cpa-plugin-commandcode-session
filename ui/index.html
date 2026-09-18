@@ -69,6 +69,16 @@ table.tok th { color:var(--muted); font-weight:600; }
   </section>
 
   <section class="panel">
+    <h2>访问代理</h2>
+    <p>请求 Command Code 模型时使用。空 = 跟随 CPA 全局 <code>proxy-url</code>。<code>direct</code> = 直连。也可填 <code>http://127.0.0.1:7890</code> 或 socks5。</p>
+    <div class="row">
+      <input id="proxyUrl" placeholder="空 / direct / http://127.0.0.1:7890" autocomplete="off">
+      <button id="btnProxy" type="button">保存代理</button>
+    </div>
+    <p id="proxyHint" class="muted"></p>
+  </section>
+
+  <section class="panel">
     <div class="row" style="justify-content:space-between">
       <h2 style="margin:0">本机累计 Token</h2>
       <button id="btnResetTokens" class="secondary" type="button">清零</button>
@@ -316,6 +326,14 @@ function renderUsage(u){
   }).join('');
 }
 function applyStatus(data){
+  const proxy=document.getElementById('proxyUrl');
+  const hint=document.getElementById('proxyHint');
+  if(proxy && data && data.proxy_url!=null && !proxy.value) proxy.value=data.proxy_url||'';
+  if(hint){
+    const cur=data&&data.proxy_url||'';
+    const g=data&&data.cpa_proxy||'';
+    hint.textContent=cur ? ('当前：'+cur) : ('当前跟随 CPA 全局'+(g?(' '+g):''));
+  }
   const box=document.getElementById('quota');
   renderTokens(data&&data.tokens);
   if(!data||data.ok===false){
@@ -357,7 +375,8 @@ async function connect(){
     if(!findKey()){ setMsg(friendlyError('missing management key', 401), false); return; }
     const data=await api('POST','/v0/management/plugins/commandcode-session/connect',{
       api_key:apiKey,
-      include_claude:document.getElementById('claude').checked
+      include_claude:document.getElementById('claude').checked,
+      proxy_url:document.getElementById('proxyUrl').value.trim()
     });
     setMsg('已加入订阅池，当前 '+(data.pool_size||1)+' 个 Key，同步 '+data.models+' 个模型。正在刷新限额…', true);
     window.__COMMANDCODE_STATUS__=null;
@@ -385,10 +404,22 @@ async function resetTokens(){
     location.reload();
   }catch(e){ setMsg(e.message,false); }
 }
+async function saveProxy(){
+  try{
+    if(!findKey()){ setMsg(friendlyError('missing management key', 401), false); return; }
+    const data=await api('PATCH','/v0/management/plugins/commandcode-session/proxy',{
+      proxy_url:document.getElementById('proxyUrl').value.trim()
+    });
+    setMsg(data.inherit ? '已保存：跟随 CPA 全局代理。' : ('已保存代理：'+(data.proxy_url||'')), true);
+    window.__COMMANDCODE_STATUS__=null;
+    location.reload();
+  }catch(e){ setMsg(e.message,false); }
+}
 document.getElementById('btnConnect').onclick=connect;
 document.getElementById('btnSync').onclick=syncModels;
 document.getElementById('btnRefresh').onclick=()=>{ window.__COMMANDCODE_STATUS__=null; location.reload(); };
 document.getElementById('btnResetTokens').onclick=resetTokens;
+document.getElementById('btnProxy').onclick=saveProxy;
 loadStatus();
 </script>
 </body>

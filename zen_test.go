@@ -84,6 +84,9 @@ func TestUpsertOpenCodeProvider(t *testing.T) {
 	if strings.Contains(string(raw), "proxy-url: direct") {
 		t.Fatalf("empty proxy_url should inherit CPA proxy, not force direct: %s", raw)
 	}
+	if !strings.Contains(string(raw), "alias: commandcode/deepseek-v4.1-flash") {
+		t.Fatalf("missing commandcode alias prefix: %s", raw)
+	}
 	if !strings.Contains(string(raw), "name: other") {
 		t.Fatal("clobbered unrelated provider")
 	}

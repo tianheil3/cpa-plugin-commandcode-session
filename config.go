@@ -19,6 +19,7 @@ type pluginConfig struct {
 	BaseURL        string   `yaml:"base_url"`
 	AlphaBaseURL   string   `yaml:"alpha_base_url"`
 	ProxyURL       string   `yaml:"proxy_url"`
+	AliasPrefix    string   `yaml:"alias_prefix"`
 	ZDR            bool     `yaml:"zdr"`
 	IncludeClaude  bool     `yaml:"include_claude"`
 }
@@ -32,6 +33,7 @@ func defaultConfig() pluginConfig {
 		CPAConfigPath:  "config.yaml",
 		ProviderName:   "commandcode",
 		BaseURL:        defaultZenBaseURL,
+		AliasPrefix:    "commandcode",
 	}
 }
 
@@ -55,7 +57,30 @@ func parseConfig(raw []byte) (pluginConfig, error) {
 	if strings.TrimSpace(cfg.AlphaBaseURL) == "" {
 		cfg.AlphaBaseURL = defaultAlphaBaseURL
 	}
+	if strings.TrimSpace(cfg.AliasPrefix) == "" {
+		cfg.AliasPrefix = "commandcode"
+	}
 	return cfg, nil
+}
+
+func (c pluginConfig) aliasPrefix() string {
+	prefix := strings.TrimSpace(c.AliasPrefix)
+	if prefix == "" {
+		return "commandcode"
+	}
+	return strings.Trim(prefix, "/")
+}
+
+func (c pluginConfig) modelAlias(name string) string {
+	name = strings.TrimSpace(name)
+	prefix := c.aliasPrefix() + "/"
+	if name == "" {
+		return ""
+	}
+	if strings.HasPrefix(name, prefix) {
+		return name
+	}
+	return prefix + name
 }
 
 func (c pluginConfig) providerName() string {
